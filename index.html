@@ -230,8 +230,10 @@ tempo();
 if (!location.search.includes('teste')) {
   ctx = cast.framework.CastReceiverContext.getInstance();
   ctx.addCustomMessageListener(NS, e => comando(typeof e.data === 'string' ? JSON.parse(e.data) : e.data));
-  ctx.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, () => {
-    if (ctx.getSenders().length === 0) ctx.stop();
+  // Só encerra quando o celular pede ("Parar transmissão"). Fechar o app no celular não para a TV:
+  // o vídeo continua e o celular retoma o controle ao reabrir.
+  ctx.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, e => {
+    if (ctx.getSenders().length === 0 && e.reason === cast.framework.system.DisconnectReason.REQUESTED_BY_SENDER) ctx.stop();
   });
   ctx.start({ skipPlayersLoad: true, disableIdleTimeout: true });
 } else {
