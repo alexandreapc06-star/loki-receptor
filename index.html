@@ -9,78 +9,158 @@
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
 <style>
-  :root { --roxo: #9b83dc; --lilas: #bfaeeb; --texto2: #9a9aa2; }
+  :root { --lilas: #bfaeeb; --texto2: #a4a4ad; --metal: linear-gradient(#d2c3f5, #a48be2 55%, #7457be); }
   html, body { margin: 0; height: 100%; background: #070707; color: #fff; font-family: Roboto, "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
   video { position: fixed; inset: 0; width: 100%; height: 100%; background: #000; object-fit: contain; }
-  #espera { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
-  #espera b { font-size: 64px; letter-spacing: 2px; font-weight: 900;
-    background: linear-gradient(#d2c3f5, #a48be2 55%, #7457be); -webkit-background-clip: text; color: transparent; }
-  #espera span { color: var(--texto2); font-size: 22px; }
-  #carregando { position: fixed; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px; border-radius: 50%;
-    border: 4px solid #ffffff22; border-top-color: #fff; animation: gira 0.9s linear infinite; display: none; }
-  @keyframes gira { to { transform: rotate(360deg); } }
-  #info { position: fixed; left: 0; right: 0; bottom: 0; padding: 120px 64px 48px; display: flex; gap: 28px; align-items: flex-end;
-    background: linear-gradient(transparent, #000d 55%); opacity: 0; transition: opacity .6s; }
-  #info.on { opacity: 1; }
-  #capa { width: 120px; height: 180px; object-fit: cover; border-radius: 14px; box-shadow: 0 10px 30px #000a; }
+  .some { opacity: 0; transition: opacity .5s; pointer-events: none; }
+  .on { opacity: 1; }
+
+  /* Esperando o celular */
+  #espera { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+    background: radial-gradient(circle at 50% 42%, #1c1630 0%, #070707 60%); }
+  #espera b { font-size: 76px; letter-spacing: 3px; font-weight: 900; background: var(--metal); -webkit-background-clip: text; color: transparent; }
+  #espera span { color: var(--texto2); font-size: 24px; }
+
+  /* Escurece um pouco o vídeo com a barra na tela (texto sempre legível) */
+  #sombra { position: fixed; inset: 0; background:
+    linear-gradient(#000c 0%, #0000 22%, #0000 55%, #000e 100%); }
+  #sombra.pausado { background: linear-gradient(#000c 0%, #0006 22%, #0006 55%, #000e 100%); }
+
+  /* Topo: marca, título e relógio */
+  #topo { position: fixed; left: 64px; right: 64px; top: 44px; display: flex; align-items: center; gap: 18px; font-size: 22px; }
+  #marca { font-weight: 900; letter-spacing: 2px; background: var(--metal); -webkit-background-clip: text; color: transparent; }
+  #topo .ponto { width: 6px; height: 6px; border-radius: 50%; background: #ffffff55; }
+  #tituloTopo { color: #e6e6ec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  #relogio { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* Base: capa, título, barra e tempos */
+  #base { position: fixed; left: 64px; right: 64px; bottom: 48px; display: flex; gap: 30px; align-items: flex-end; }
+  #capa { width: 112px; height: 168px; object-fit: cover; border-radius: 14px; box-shadow: 0 12px 34px #000b; flex: none; }
   #capa:not([src]) { display: none; }
   #texto { flex: 1; min-width: 0; }
-  #marca { color: var(--lilas); font-size: 18px; font-weight: 700; letter-spacing: 1px; }
-  #titulo { font-size: 38px; font-weight: 800; margin: 6px 0 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #linha { display: flex; align-items: center; gap: 18px; font-size: 20px; color: #ddd; font-variant-numeric: tabular-nums; }
-  #barra { flex: 1; height: 5px; border-radius: 3px; background: #ffffff33; overflow: hidden; }
-  #feito { height: 100%; width: 0; background: linear-gradient(90deg, #a48be2, #d2c3f5); }
-  #vivo { display: none; padding: 4px 12px; border-radius: 8px; background: #e0303a; color: #fff; font-weight: 800; font-size: 16px; }
-  #dica { color: var(--texto2); font-size: 16px; margin-top: 12px; }
-  #erro { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 26px; text-align: center; display: none; max-width: 70%; }
+  #selo { width: fit-content; padding: 5px 12px; border-radius: 8px; font-size: 15px; font-weight: 800; letter-spacing: 1px;
+    background: #ffffff1f; color: #e6e6ec; }
+  #selo.vivo { background: #e0303a; color: #fff; }
+  #titulo { font-size: 44px; font-weight: 800; margin: 0 0 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.5px; }
+  #trilho { position: relative; height: 6px; border-radius: 3px; background: #ffffff2e; }
+  #carregado, #feito { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; width: 0; }
+  #carregado { background: #ffffff40; }
+  #feito { background: linear-gradient(90deg, #7457be, #bfaeeb); }
+  #bolinha { position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 5px #bfaeeb55; left: 0; }
+  #tempos { display: flex; justify-content: space-between; margin-top: 14px; font-size: 21px; color: #e6e6ec; font-variant-numeric: tabular-nums; }
+  #falta { color: var(--texto2); }
+  #teclas { display: flex; gap: 26px; margin-top: 20px; color: var(--texto2); font-size: 17px; }
+  #teclas kbd { font: inherit; font-weight: 700; color: #fff; padding: 3px 10px; margin-right: 8px; border-radius: 7px; border: 1.5px solid #ffffff40; }
+  .vivo-so { display: none; }
+  body.aoVivo .vod-so { display: none; }
+  body.aoVivo .vivo-so { display: block; }
+  body.aoVivo #titulo { margin: 12px 0 0; }
+
+  /* Centro: pausa (fica) e "tocou" (some) */
+  #centro { position: fixed; left: 50%; top: 50%; width: 132px; height: 132px; margin: -66px; border-radius: 50%;
+    background: #0008; border: 2px solid #ffffff38; display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px); transition: opacity .35s, transform .35s; transform: scale(.85); }
+  #centro.on { transform: scale(1); }
+  #centro svg { width: 60px; height: 60px; fill: #fff; }
+
+  /* ±10 s: bolha que aparece do lado */
+  .salto { position: fixed; top: 50%; margin-top: -56px; width: 112px; height: 112px; border-radius: 50%; background: #0008;
+    border: 2px solid #ffffff30; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 30px; font-weight: 800;
+    transition: opacity .3s, transform .3s; transform: scale(.8); }
+  .salto.on { transform: scale(1); }
+  .salto small { font-size: 15px; font-weight: 600; color: var(--texto2); }
+  #menos { left: 22%; } #mais { right: 22%; }
+
+  /* Carregando: anel em metal lilás */
+  #carregando { position: fixed; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px; border-radius: 50%;
+    background: conic-gradient(#0000 0 25%, #7457be 55%, #d2c3f5);
+    -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 6px), #000 0); animation: gira .9s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+
+  #erro { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 34px 48px; border-radius: 22px;
+    background: #151519ee; border: 1.5px solid #ffffff22; font-size: 26px; text-align: center; max-width: 60%; display: none; }
+  #erro small { display: block; color: var(--texto2); font-size: 19px; margin-top: 10px; }
 </style>
 </head>
 <body>
 <video id="v" autoplay></video>
 <div id="espera"><b>LOKI PLAYER</b><span>Escolha o que assistir no celular</span></div>
-<div id="carregando"></div>
-<div id="erro"></div>
-<div id="info">
+<div id="sombra" class="some"></div>
+<div id="topo" class="some"><span id="marca">LOKI PLAYER</span><span class="ponto"></span><span id="tituloTopo"></span><span id="relogio"></span></div>
+<div id="base" class="some">
   <img id="capa" alt="">
   <div id="texto">
-    <div id="marca">LOKI PLAYER</div>
+    <span id="selo" class="vivo vivo-so">AO VIVO</span>
     <div id="titulo"></div>
-    <div id="linha"><span id="vivo">AO VIVO</span><span id="agora"></span><div id="barra"><div id="feito"></div></div><span id="total"></span></div>
-    <div id="dica"></div>
+    <div class="vod-so">
+      <div id="trilho"><div id="carregado"></div><div id="feito"></div><div id="bolinha"></div></div>
+      <div id="tempos"><span id="agora">0:00</span><span id="falta"></span></div>
+      <div id="teclas"><span><kbd>OK</kbd><span id="okFaz">Pausar</span></span><span><kbd>←</kbd><kbd>→</kbd>10 segundos</span></div>
+    </div>
   </div>
 </div>
+<div id="centro" class="some"><svg id="icone" viewBox="0 0 24 24"></svg></div>
+<div id="menos" class="salto some">−10<small>seg</small></div>
+<div id="mais" class="salto some">+10<small>seg</small></div>
+<div id="carregando" style="display:none"></div>
+<div id="erro"></div>
 <script>
 const NS = 'urn:x-cast:com.lokiplayer';
 const $ = id => document.getElementById(id);
 const v = $('v');
-let ts = null, aoVivo = false, esconder = 0;
+const PLAY = '<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>';
+const PAUSA = '<rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/>';
+let ts = null, aoVivo = false, esconder = 0, tocou = 0;
 
 function hms(s) {
   s = Math.max(0, Math.floor(s || 0));
   const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0');
   return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`;
 }
+const hora = d => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-/** Mostra título e tempo por alguns segundos (sempre que algo muda); pausado fica na tela. */
-function mostrarInfo(seg = 8) {
-  $('info').classList.add('on');
+/** Barra, título e relógio por alguns segundos (sempre que algo muda); pausado fica na tela. */
+function mostrarInfo(seg = 6) {
+  ['sombra', 'topo', 'base'].forEach(id => $(id).classList.add('on'));
   clearTimeout(esconder);
-  esconder = setTimeout(() => { if (!v.paused) $('info').classList.remove('on'); }, seg * 1000);
+  esconder = setTimeout(() => { if (!v.paused || aoVivo) ['sombra', 'topo', 'base'].forEach(id => $(id).classList.remove('on')); }, seg * 1000);
+}
+/** Ícone grande no meio: pausado fica; play aparece e some. */
+function centro() {
+  const pausado = v.paused && !aoVivo && v.readyState > 0;
+  $('icone').innerHTML = pausado ? PAUSA : PLAY;
+  $('okFaz').textContent = pausado ? 'Continuar' : 'Pausar';
+  $('centro').classList.add('on');
+  $('sombra').classList.toggle('pausado', pausado);
+  clearTimeout(tocou);
+  if (!pausado) tocou = setTimeout(() => $('centro').classList.remove('on'), 700);
+}
+function salto(id) {
+  const b = $(id); b.classList.add('on');
+  clearTimeout(b.t); b.t = setTimeout(() => b.classList.remove('on'), 650);
+}
+function ir(seg) {
+  if (aoVivo || !v.duration) return;
+  v.currentTime = Math.min(Math.max(0, v.currentTime + seg), v.duration - 1);
+  salto(seg < 0 ? 'menos' : 'mais'); tempo(); mostrarInfo();
 }
 
-function erro(msg) { $('carregando').style.display = 'none'; $('erro').textContent = msg; $('erro').style.display = 'block'; }
+function erro(msg) {
+  $('carregando').style.display = 'none';
+  $('erro').innerHTML = msg + '<small>Tente outro no celular</small>'; $('erro').style.display = 'block';
+}
 
 function abrir(m) {
   if (ts) { ts.destroy(); ts = null; }
   v.removeAttribute('src'); v.load();
   aoVivo = !!m.aoVivo;
-  dica();
+  document.body.classList.toggle('aoVivo', aoVivo);
   $('espera').style.display = 'none'; $('erro').style.display = 'none';
+  $('centro').classList.remove('on');
   $('carregando').style.display = 'block';
-  $('titulo').textContent = m.titulo || '';
+  $('titulo').textContent = $('tituloTopo').textContent = m.titulo || '';
   if (m.capa) $('capa').src = m.capa; else $('capa').removeAttribute('src');
-  $('vivo').style.display = aoVivo ? 'inline-block' : 'none';
-  ['agora', 'barra', 'total'].forEach(id => $(id).style.display = aoVivo ? 'none' : '');
   if (aoVivo && /\.ts(\?|$)/.test(m.url) && mpegts.isSupported()) {
     ts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: m.url },
       { enableStashBuffer: true, stashInitialSize: 1024 * 1024, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 8 });
@@ -94,23 +174,23 @@ function abrir(m) {
   mostrarInfo(10);
 }
 
+function alternar() { if (aoVivo) return; v.paused ? v.play() : v.pause(); }
 function comando(m) {
   if (m.acao === 'abrir') abrir(m);
-  else if (m.acao === 'alternar') { v.paused ? v.play() : v.pause(); mostrarInfo(); }
-  else if (m.acao === 'ir' && !aoVivo) { v.currentTime = Math.max(0, v.currentTime + m.seg); mostrarInfo(); }
+  else if (m.acao === 'alternar') alternar();
+  else if (m.acao === 'ir') ir(m.seg);
   else if (m.acao === 'para' && !aoVivo) { v.currentTime = Math.max(0, m.seg); mostrarInfo(); }
 }
 
 // ── Controle remoto da TV: OK pausa/continua, ←/→ voltam/avançam 10 s; qualquer seta mostra a barra ──
-// (trocar o idioma não dá: o Chromecast não expõe as faixas de áudio de um arquivo tocado direto)
-function dica() { $('dica').textContent = aoVivo ? '' : 'OK pausa · ← → 10 s'; }
+// (trocar áudio/legenda não dá: o Chromecast não expõe as faixas de um arquivo tocado direto)
 document.addEventListener('keydown', e => {
   const k = e.key;
-  if (k === 'Enter' || k === 'MediaPlayPause' || k === ' ') { if (!aoVivo) v.paused ? v.play() : v.pause(); }
+  if (k === 'Enter' || k === 'MediaPlayPause' || k === ' ') alternar();
   else if (k === 'MediaPlay') v.play();
   else if (k === 'MediaPause') v.pause();
-  else if ((k === 'ArrowLeft' || k === 'MediaRewind') && !aoVivo) v.currentTime = Math.max(0, v.currentTime - 10);
-  else if ((k === 'ArrowRight' || k === 'MediaFastForward') && !aoVivo) v.currentTime = v.currentTime + 10;
+  else if (k === 'ArrowLeft' || k === 'MediaRewind') ir(-10);
+  else if (k === 'ArrowRight' || k === 'MediaFastForward') ir(10);
   else if (!k.startsWith('Arrow')) return; // Voltar e outras teclas seguem para a TV
   mostrarInfo(); e.preventDefault();
 });
@@ -126,16 +206,25 @@ setInterval(contar, 5000);
 
 v.addEventListener('playing', () => { $('carregando').style.display = 'none'; });
 v.addEventListener('waiting', () => { $('carregando').style.display = 'block'; });
-v.addEventListener('pause', () => { $('info').classList.add('on'); clearTimeout(esconder); });
-v.addEventListener('play', () => mostrarInfo());
+v.addEventListener('pause', () => { centro(); mostrarInfo(); });
+v.addEventListener('play', () => { centro(); mostrarInfo(); });
 v.addEventListener('error', () => { if (!ts) erro('Não foi possível tocar este vídeo.'); });
 function tempo() {
-  if (aoVivo) return;
+  $('relogio').textContent = hora(new Date());
+  if (aoVivo || !v.duration) return;
+  const p = 100 * v.currentTime / v.duration;
+  $('feito').style.width = p + '%';
+  $('bolinha').style.left = p + '%';
+  let c = 0;
+  for (let i = 0; i < v.buffered.length; i++) if (v.buffered.start(i) <= v.currentTime) c = v.buffered.end(i);
+  $('carregado').style.width = (100 * c / v.duration) + '%';
   $('agora').textContent = hms(v.currentTime);
-  $('total').textContent = hms(v.duration);
-  $('feito').style.width = (v.duration ? 100 * v.currentTime / v.duration : 0) + '%';
+  const falta = v.duration - v.currentTime;
+  $('falta').textContent = `−${hms(falta)}  ·  termina às ${hora(new Date(Date.now() + falta * 1000))}`;
 }
 ['timeupdate', 'seeked', 'loadedmetadata'].forEach(e => v.addEventListener(e, tempo));
+setInterval(tempo, 15000);
+tempo();
 
 if (!location.search.includes('teste')) {
   ctx = cast.framework.CastReceiverContext.getInstance();
