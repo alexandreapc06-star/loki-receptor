@@ -31,6 +31,12 @@
   #barra { flex: 1; height: 5px; border-radius: 3px; background: #ffffff33; overflow: hidden; }
   #feito { height: 100%; width: 0; background: linear-gradient(90deg, #a48be2, #d2c3f5); }
   #vivo { display: none; padding: 4px 12px; border-radius: 8px; background: #e0303a; color: #fff; font-weight: 800; font-size: 16px; }
+  #audio { position: fixed; right: 64px; bottom: 200px; min-width: 320px; padding: 14px; border-radius: 18px; background: #151519ee; display: none; }
+  #audio.on { display: block; }
+  #audio h3 { margin: 4px 12px 10px; font-size: 18px; color: var(--texto2); font-weight: 600; }
+  #audio div { padding: 12px 16px; border-radius: 12px; font-size: 22px; }
+  #audio div.sel { background: linear-gradient(#d2c3f5, #a48be2 55%, #7457be); color: #18122b; font-weight: 700; }
+  #dica { color: var(--texto2); font-size: 16px; margin-top: 12px; }
   #erro { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 26px; text-align: center; display: none; max-width: 70%; }
 </style>
 </head>
@@ -39,12 +45,14 @@
 <div id="espera"><b>LOKI PLAYER</b><span>Escolha o que assistir no celular</span></div>
 <div id="carregando"></div>
 <div id="erro"></div>
+<div id="audio"><h3>Áudio</h3><span id="faixas"></span></div>
 <div id="info">
   <img id="capa" alt="">
   <div id="texto">
     <div id="marca">LOKI PLAYER</div>
     <div id="titulo"></div>
     <div id="linha"><span id="vivo">AO VIVO</span><span id="agora"></span><div id="barra"><div id="feito"></div></div><span id="total"></span></div>
+    <div id="dica"></div>
   </div>
 </div>
 <script>
@@ -72,6 +80,7 @@ function abrir(m) {
   if (ts) { ts.destroy(); ts = null; }
   v.removeAttribute('src'); v.load();
   aoVivo = !!m.aoVivo;
+  menu = -1; $('audio').classList.remove('on'); dica();
   $('espera').style.display = 'none'; $('erro').style.display = 'none';
   $('carregando').style.display = 'block';
   $('titulo').textContent = m.titulo || '';
@@ -95,7 +104,57 @@ function comando(m) {
   if (m.acao === 'abrir') abrir(m);
   else if (m.acao === 'alternar') { v.paused ? v.play() : v.pause(); mostrarInfo(); }
   else if (m.acao === 'ir' && !aoVivo) { v.currentTime = Math.max(0, v.currentTime + m.seg); mostrarInfo(); }
+  else if (m.acao === 'para' && !aoVivo) { v.currentTime = Math.max(0, m.seg); mostrarInfo(); }
 }
+
+// ── Controle remoto da TV: OK pausa/continua, ←/→ voltam/avançam 10 s, ↓ abre o áudio; qualquer tecla mostra a barra ──
+let menu = -1; // -1 = menu de áudio fechado; senão, a faixa marcada
+function faixas() { return v.audioTracks ? Array.from(v.audioTracks) : []; }
+function nomeFaixa(t, i) {
+  const l = (t.label || t.language || '').trim();
+  const nomes = { pt: 'Português', 'pt-BR': 'Português', por: 'Português', en: 'Inglês', eng: 'Inglês', es: 'Espanhol', spa: 'Espanhol' };
+  return nomes[l] || l || `Áudio ${i + 1}`;
+}
+function desenharMenu() {
+  $('faixas').innerHTML = '';
+  faixas().forEach((t, i) => {
+    const d = document.createElement('div');
+    d.textContent = (t.enabled ? '✓ ' : '   ') + nomeFaixa(t, i);
+    if (i === menu) d.className = 'sel';
+    $('faixas').appendChild(d);
+  });
+  $('audio').classList.toggle('on', menu >= 0);
+}
+function dica() { $('dica').textContent = aoVivo ? '' : 'OK pausa · ← → 10 s' + (faixas().length > 1 ? ' · ↓ áudio' : ''); }
+document.addEventListener('keydown', e => {
+  const k = e.key, f = faixas();
+  if (menu >= 0) { // menu de áudio aberto
+    if (k === 'ArrowDown') menu = Math.min(menu + 1, f.length - 1);
+    else if (k === 'ArrowUp') menu = Math.max(menu - 1, 0);
+    else if (k === 'Enter') { f.forEach((t, i) => t.enabled = i === menu); menu = -1; }
+    else if (k === 'ArrowLeft' || k === 'Escape' || k === 'Backspace' || k === 'GoBack') menu = -1;
+    else return;
+    desenharMenu(); mostrarInfo(); e.preventDefault(); return;
+  }
+  if (k === 'Enter' || k === 'MediaPlayPause' || k === ' ') { if (!aoVivo) v.paused ? v.play() : v.pause(); }
+  else if (k === 'MediaPlay') v.play();
+  else if (k === 'MediaPause') v.pause();
+  else if ((k === 'ArrowLeft' || k === 'MediaRewind') && !aoVivo) v.currentTime = Math.max(0, v.currentTime - 10);
+  else if ((k === 'ArrowRight' || k === 'MediaFastForward') && !aoVivo) v.currentTime = v.currentTime + 10;
+  else if (k === 'ArrowDown' && f.length > 1) { menu = Math.max(0, f.findIndex(t => t.enabled)); desenharMenu(); }
+  else if (!k.startsWith('Arrow')) return; // Voltar e outras teclas seguem para a TV
+  dica(); mostrarInfo(); e.preventDefault();
+});
+
+// ── Conta ao celular onde está (ele guarda o "continuar de onde parou" e mostra o tempo) ──
+let ctx = null;
+function contar() {
+  if (!ctx || aoVivo || !v.duration) return;
+  ctx.sendCustomMessage(NS, undefined, { acao: 'tempo', pos: v.currentTime, dur: v.duration, pausado: v.paused });
+}
+setInterval(contar, 5000);
+['pause', 'play', 'seeked'].forEach(e => v.addEventListener(e, contar));
+v.addEventListener('loadedmetadata', dica);
 
 v.addEventListener('playing', () => { $('carregando').style.display = 'none'; });
 v.addEventListener('waiting', () => { $('carregando').style.display = 'block'; });
@@ -111,7 +170,7 @@ function tempo() {
 ['timeupdate', 'seeked', 'loadedmetadata'].forEach(e => v.addEventListener(e, tempo));
 
 if (!location.search.includes('teste')) {
-  const ctx = cast.framework.CastReceiverContext.getInstance();
+  ctx = cast.framework.CastReceiverContext.getInstance();
   ctx.addCustomMessageListener(NS, e => comando(typeof e.data === 'string' ? JSON.parse(e.data) : e.data));
   ctx.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, () => {
     if (ctx.getSenders().length === 0) ctx.stop();
