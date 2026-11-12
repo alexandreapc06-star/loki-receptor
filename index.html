@@ -236,6 +236,9 @@ if (!location.search.includes('teste')) {
     if (ctx.getSenders().length === 0 && e.reason === cast.framework.system.DisconnectReason.REQUESTED_BY_SENDER) ctx.stop();
   });
   ctx.start({ skipPlayersLoad: true, disableIdleTimeout: true });
+  // Abriram outro app na TV (Globoplay etc.): o LOKI fica escondido e o celular ainda achava que estava conectado,
+  // mandava o vídeo e nada aparecia. Encerrando, o celular vê que desconectou e o próximo "transmitir" abre o LOKI de novo.
+  document.addEventListener('visibilitychange', () => { if (document.hidden) ctx.stop(); });
 } else {
   // index.html?teste no computador: toca o que estiver em teste.json
   fetch('teste.json').then(r => r.ok ? r.json() : null).then(m => m && abrir(m)).catch(() => {});
