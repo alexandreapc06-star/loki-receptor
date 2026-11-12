@@ -60,7 +60,7 @@
   /* Centro: pausa (fica) e "tocou" (some) */
   #centro { position: fixed; left: 50%; top: 50%; width: 132px; height: 132px; margin: -66px; border-radius: 50%;
     background: #0008; border: 2px solid #ffffff38; display: flex; align-items: center; justify-content: center;
-    backdrop-filter: blur(6px); transition: opacity .35s, transform .35s; transform: scale(.85); }
+    transition: opacity .35s, transform .35s; transform: scale(.85); }
   #centro.on { transform: scale(1); }
   #centro svg { width: 60px; height: 60px; fill: #fff; }
 
@@ -73,9 +73,8 @@
   #menos { left: 22%; } #mais { right: 22%; }
 
   /* Carregando: anel em metal lilás */
-  #carregando { position: fixed; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px; border-radius: 50%;
-    background: conic-gradient(#0000 0 25%, #7457be 55%, #d2c3f5);
-    -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 6px), #000 0); animation: gira .9s linear infinite; }
+  #carregando { position: fixed; left: 50%; top: 50%; width: 64px; height: 64px; margin: -38px; border-radius: 50%;
+    border: 6px solid #ffffff22; border-top-color: #bfaeeb; animation: gira .9s linear infinite; }
   @keyframes gira { to { transform: rotate(360deg); } }
 
   #erro { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 34px 48px; border-radius: 22px;
