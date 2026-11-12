@@ -150,7 +150,7 @@ document.addEventListener('keydown', e => {
 let ctx = null;
 function contar() {
   if (!ctx || aoVivo || !v.duration) return;
-  ctx.sendCustomMessage(NS, undefined, { acao: 'tempo', pos: v.currentTime, dur: v.duration, pausado: v.paused });
+  ctx.sendCustomMessage(NS, undefined, { acao: 'tempo', pos: v.currentTime, dur: v.duration, pausado: v.paused, faixas: v.audioTracks ? v.audioTracks.length : -1 });
 }
 setInterval(contar, 5000);
 ['pause', 'play', 'seeked'].forEach(e => v.addEventListener(e, contar));
