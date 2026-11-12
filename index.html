@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>LOKI PLAYER</title>
+<!-- Receptor do LOKI PLAYER para Chromecast / Google TV.
+     Toca filmes/séries direto no <video> e canais ao vivo em .ts com mpegts.js (o receptor padrão do Google não toca .ts).
+     O celular manda mensagens no canal urn:x-cast:com.lokiplayer: {acao:"abrir", url, titulo, capa, aoVivo, inicio} -->
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
+<style>
+  :root { --roxo: #9b83dc; --lilas: #bfaeeb; --texto2: #9a9aa2; }
+  html, body { margin: 0; height: 100%; background: #070707; color: #fff; font-family: Roboto, "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
+  video { position: fixed; inset: 0; width: 100%; height: 100%; background: #000; object-fit: contain; }
+  #espera { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+  #espera b { font-size: 64px; letter-spacing: 2px; font-weight: 900;
+    background: linear-gradient(#d2c3f5, #a48be2 55%, #7457be); -webkit-background-clip: text; color: transparent; }
+  #espera span { color: var(--texto2); font-size: 22px; }
+  #carregando { position: fixed; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px; border-radius: 50%;
+    border: 4px solid #ffffff22; border-top-color: #fff; animation: gira 0.9s linear infinite; display: none; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  #info { position: fixed; left: 0; right: 0; bottom: 0; padding: 120px 64px 48px; display: flex; gap: 28px; align-items: flex-end;
+    background: linear-gradient(transparent, #000d 55%); opacity: 0; transition: opacity .6s; }
+  #info.on { opacity: 1; }
+  #capa { width: 120px; height: 180px; object-fit: cover; border-radius: 14px; box-shadow: 0 10px 30px #000a; }
+  #capa:not([src]) { display: none; }
+  #texto { flex: 1; min-width: 0; }
+  #marca { color: var(--lilas); font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+  #titulo { font-size: 38px; font-weight: 800; margin: 6px 0 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #linha { display: flex; align-items: center; gap: 18px; font-size: 20px; color: #ddd; font-variant-numeric: tabular-nums; }
+  #barra { flex: 1; height: 5px; border-radius: 3px; background: #ffffff33; overflow: hidden; }
+  #feito { height: 100%; width: 0; background: linear-gradient(90deg, #a48be2, #d2c3f5); }
+  #vivo { display: none; padding: 4px 12px; border-radius: 8px; background: #e0303a; color: #fff; font-weight: 800; font-size: 16px; }
+  #erro { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 26px; text-align: center; display: none; max-width: 70%; }
+</style>
+</head>
+<body>
+<video id="v" autoplay></video>
+<div id="espera"><b>LOKI PLAYER</b><span>Escolha o que assistir no celular</span></div>
+<div id="carregando"></div>
+<div id="erro"></div>
+<div id="info">
+  <img id="capa" alt="">
+  <div id="texto">
+    <div id="marca">LOKI PLAYER</div>
+    <div id="titulo"></div>
+    <div id="linha"><span id="vivo">AO VIVO</span><span id="agora"></span><div id="barra"><div id="feito"></div></div><span id="total"></span></div>
+  </div>
+</div>
+<script>
+const NS = 'urn:x-cast:com.lokiplayer';
+const $ = id => document.getElementById(id);
+const v = $('v');
+let ts = null, aoVivo = false, esconder = 0;
+
+function hms(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`;
+}
+
+/** Mostra título e tempo por alguns segundos (sempre que algo muda); pausado fica na tela. */
+function mostrarInfo(seg = 8) {
+  $('info').classList.add('on');
+  clearTimeout(esconder);
+  esconder = setTimeout(() => { if (!v.paused) $('info').classList.remove('on'); }, seg * 1000);
+}
+
+function erro(msg) { $('carregando').style.display = 'none'; $('erro').textContent = msg; $('erro').style.display = 'block'; }
+
+function abrir(m) {
+  if (ts) { ts.destroy(); ts = null; }
+  v.removeAttribute('src'); v.load();
+  aoVivo = !!m.aoVivo;
+  $('espera').style.display = 'none'; $('erro').style.display = 'none';
+  $('carregando').style.display = 'block';
+  $('titulo').textContent = m.titulo || '';
+  if (m.capa) $('capa').src = m.capa; else $('capa').removeAttribute('src');
+  $('vivo').style.display = aoVivo ? 'inline-block' : 'none';
+  ['agora', 'barra', 'total'].forEach(id => $(id).style.display = aoVivo ? 'none' : '');
+  if (aoVivo && /\.ts(\?|$)/.test(m.url) && mpegts.isSupported()) {
+    ts = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: m.url },
+      { enableStashBuffer: true, stashInitialSize: 1024 * 1024, liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 8 });
+    ts.on(mpegts.Events.ERROR, () => erro('Não foi possível tocar este canal.'));
+    ts.attachMediaElement(v); ts.load(); ts.play();
+  } else {
+    v.src = m.url;
+    if (m.inicio > 0) v.addEventListener('loadedmetadata', () => { v.currentTime = m.inicio; }, { once: true });
+    v.play().catch(() => {});
+  }
+  mostrarInfo(10);
+}
+
+function comando(m) {
+  if (m.acao === 'abrir') abrir(m);
+  else if (m.acao === 'alternar') { v.paused ? v.play() : v.pause(); mostrarInfo(); }
+  else if (m.acao === 'ir' && !aoVivo) { v.currentTime = Math.max(0, v.currentTime + m.seg); mostrarInfo(); }
+}
+
+v.addEventListener('playing', () => { $('carregando').style.display = 'none'; });
+v.addEventListener('waiting', () => { $('carregando').style.display = 'block'; });
+v.addEventListener('pause', () => { $('info').classList.add('on'); clearTimeout(esconder); });
+v.addEventListener('play', () => mostrarInfo());
+v.addEventListener('error', () => { if (!ts) erro('Não foi possível tocar este vídeo.'); });
+function tempo() {
+  if (aoVivo) return;
+  $('agora').textContent = hms(v.currentTime);
+  $('total').textContent = hms(v.duration);
+  $('feito').style.width = (v.duration ? 100 * v.currentTime / v.duration : 0) + '%';
+}
+['timeupdate', 'seeked', 'loadedmetadata'].forEach(e => v.addEventListener(e, tempo));
+
+if (!location.search.includes('teste')) {
+  const ctx = cast.framework.CastReceiverContext.getInstance();
+  ctx.addCustomMessageListener(NS, e => comando(typeof e.data === 'string' ? JSON.parse(e.data) : e.data));
+  ctx.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, () => {
+    if (ctx.getSenders().length === 0) ctx.stop();
+  });
+  ctx.start({ skipPlayersLoad: true, disableIdleTimeout: true });
+} else {
+  // index.html?teste no computador: toca o que estiver em teste.json
+  fetch('teste.json').then(r => r.ok ? r.json() : null).then(m => m && abrir(m)).catch(() => {});
+}
+</script>
+</body>
+</html>
